@@ -1,0 +1,8 @@
+{
+  "name": "PAUD Cerdas - Montessori E-Learning",
+  "description": "A comprehensive e-learning and management platform for Early Childhood Education (PAUD) using Montessori methodology. Features student tracking, daily activities, attendance, e-learning modules, and AI-powered progress analysis.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
