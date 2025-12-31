@@ -94,6 +94,7 @@ export interface ElearningModule {
   content_url: string;
   duration_minutes: number;
   is_live_stream?: boolean;
+  linked_quiz_id?: number;
 }
 
 export interface LearningGame {

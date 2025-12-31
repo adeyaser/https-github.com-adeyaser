@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Users, School, Star, Activity, ArrowUpRight } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { MOCK_STUDENTS, LEARNING_AREAS } from '../constants';
 
 const data = [
@@ -31,7 +31,11 @@ const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
   </div>
 );
 
-const DashboardView: React.FC = () => {
+interface DashboardViewProps {
+  onNavigate?: (path: string) => void;
+}
+
+const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -39,7 +43,10 @@ const DashboardView: React.FC = () => {
           <h1 className="text-2xl font-bold text-slate-800">Halo, Ibu Dewi! 👋</h1>
           <p className="text-slate-500">Berikut adalah ringkasan perkembangan Kelas A hari ini.</p>
         </div>
-        <button className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-semibold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2">
+        <button 
+          onClick={() => onNavigate?.('/assessment')}
+          className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-semibold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2"
+        >
           <Activity size={20} />
           Catat Observasi Baru
         </button>
@@ -54,7 +61,6 @@ const DashboardView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Performance Chart */}
         <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-lg font-bold text-slate-800">Tren Perkembangan Kognitif</h2>
@@ -84,12 +90,11 @@ const DashboardView: React.FC = () => {
           </div>
         </div>
 
-        {/* Learning Areas Sidebar */}
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
           <h2 className="text-lg font-bold text-slate-800 mb-6">Area Montessori</h2>
           <div className="space-y-4">
             {LEARNING_AREAS.map((area) => (
-              <div key={area.area_id} className="group cursor-pointer">
+              <div key={area.area_id} className="group cursor-pointer" onClick={() => onNavigate?.('/learning')}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold text-slate-700">{area.area_name}</span>
                   <span className="text-xs font-bold text-slate-400">85%</span>
@@ -106,16 +111,19 @@ const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* Recent Students */}
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-slate-800">Daftar Siswa Aktif</h2>
-          <button className="text-blue-600 text-sm font-bold hover:underline">Lihat Semua</button>
+          <button onClick={() => onNavigate?.('/students')} className="text-blue-600 text-sm font-bold hover:underline">Lihat Semua</button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {MOCK_STUDENTS.map((student) => (
-            <div key={student.student_id} className="flex items-center gap-4 p-4 border border-slate-50 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer">
-              <img src={student.photo} className="w-12 h-12 rounded-2xl object-cover shadow-sm" alt={student.full_name} />
+            <div 
+              key={student.student_id} 
+              onClick={() => onNavigate?.('/students')}
+              className="flex items-center gap-4 p-4 border border-slate-50 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer group"
+            >
+              <img src={student.photo} className="w-12 h-12 rounded-2xl object-cover shadow-sm group-hover:scale-105 transition-transform" alt={student.full_name} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-slate-800 truncate">{student.full_name}</p>
                 <p className="text-xs text-slate-500 font-medium">NIS: {student.nis}</p>

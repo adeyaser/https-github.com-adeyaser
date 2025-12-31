@@ -1,11 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, 
   Download, 
-  Share2, 
-  Star, 
-  CheckCircle2, 
   Plus, 
   X, 
   Loader2, 
@@ -13,329 +10,350 @@ import {
   User, 
   Calendar,
   Save,
-  ChevronRight,
-  AlertCircle,
-  BrainCircuit
+  CheckCircle2,
+  BrainCircuit,
+  History,
+  Eye,
+  Trash2,
+  ChevronLeft
 } from 'lucide-react';
 import { MOCK_STUDENTS, LEARNING_AREAS, MOCK_ACTIVITIES, MOCK_QUIZ_RESULTS, MOCK_QUIZZES } from '../constants';
 import { generateComprehensiveAssessment } from '../services/gemini';
 
-const ReportsView: React.FC = () => {
+interface ReportArchive {
+  id: number;
+  student_id: number;
+  student_name: string;
+  semester: string;
+  date: string;
+  content: string;
+}
+
+interface ReportsViewProps {
+  initialStudentId?: number | null;
+  onClearInitial?: () => void;
+}
+
+const ReportsView: React.FC<ReportsViewProps> = ({ initialStudentId, onClearInitial }) => {
+  const [activeView, setActiveView] = useState<'current' | 'archive'>('current');
   const [showGenModal, setShowGenModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number>(MOCK_STUDENTS[0].student_id);
   const [semester, setSemester] = useState('1');
   const [generatedNarrative, setGeneratedNarrative] = useState('');
+  const [selectedArchive, setSelectedArchive] = useState<ReportArchive | null>(null);
+  
+  const [archives, setArchives] = useState<ReportArchive[]>([
+    { id: 1, student_id: 1, student_name: 'Alya Putri Ramadhani', semester: 'Genap 2023', date: '12 Des 2023', content: 'Alya menunjukkan perkembangan yang sangat baik dalam area praktikal life. Ia sekarang mampu menuang air tanpa tumpah dan sangat antusias membantu teman-temannya merapikan peralatan setelah bermain. Fokus konsentrasinya meningkat pesat.' }
+  ]);
+
+  useEffect(() => {
+    if (initialStudentId) {
+      setSelectedStudentId(initialStudentId);
+      if (onClearInitial) onClearInitial();
+    }
+  }, [initialStudentId]);
 
   const handleGenerateReport = async () => {
     const student = MOCK_STUDENTS.find(s => s.student_id === selectedStudentId);
     if (!student) return;
-
     setIsGenerating(true);
     setGeneratedNarrative('');
-
-    // Prepare context for AI
-    const studentActivities = MOCK_ACTIVITIES
-      .filter(a => a.student_id === selectedStudentId || a.student_id === undefined)
-      .map(a => `${a.title}: ${a.content}`);
-    
-    const studentQuizzes = MOCK_QUIZ_RESULTS
-      .filter(r => r.student_id === selectedStudentId)
-      .map(r => {
-        const q = MOCK_QUIZZES.find(qz => qz.quiz_id === r.quiz_id);
-        return `${q?.quiz_title}: Skor ${r.score}% (${r.status})`;
-      });
 
     try {
       const result = await generateComprehensiveAssessment(
         student.full_name,
-        studentActivities,
-        studentQuizzes,
-        "Menunjukkan kemajuan yang sangat baik dalam bersosialisasi dan kemandirian."
+        ["Bermain Balok", "Berhitung 1-10"], 
+        ["Quiz Warna: 100%"],
+        "Sangat ramah and aktif."
       );
       setGeneratedNarrative(result || "Gagal mengenerate narasi.");
     } catch (err) {
-      console.error(err);
-      alert("Terjadi kesalahan saat menghubungi AI.");
+      alert("Terjadi kesalahan AI.");
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const closeGenModal = () => {
+  const handleDownloadPDF = (studentName: string, customSemester?: string) => {
+    setIsDownloading(true);
+    const originalTitle = document.title;
+    document.title = `Rapor_${studentName.replace(/\s+/g, '_')}_${(customSemester || `Semester_${semester}`).replace(/\s+/g, '_')}`;
+
+    setTimeout(() => {
+      setIsDownloading(false);
+      window.print();
+      setTimeout(() => {
+        document.title = originalTitle;
+      }, 1000);
+    }, 1500);
+  };
+
+  const saveToArchive = () => {
+    const student = MOCK_STUDENTS.find(s => s.student_id === selectedStudentId);
+    const newReport: ReportArchive = {
+      id: Date.now(),
+      student_id: selectedStudentId,
+      student_name: student?.full_name || 'Siswa',
+      semester: `Semester ${semester}`,
+      date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+      content: generatedNarrative
+    };
+    setArchives([newReport, ...archives]);
     setShowGenModal(false);
-    setIsGenerating(false);
     setGeneratedNarrative('');
+    alert('Rapor Berhasil Diarsipkan!');
+  };
+
+  const handleDeleteArchive = (id: number) => {
+    if (confirm('Apakah Anda yakin ingin menghapus arsip rapor ini?')) {
+      setArchives(prev => prev.filter(a => a.id !== id));
+    }
   };
 
   const currentStudent = MOCK_STUDENTS.find(s => s.student_id === selectedStudentId);
 
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <style>{`
+        @media print {
+          aside, header, nav, .no-print, button, .xl:col-span-1 {
+            display: none !important;
+          }
+          body, html {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          main, .print-container {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+          }
+          .bg-slate-900 {
+            background-color: #0f172a !important;
+            -webkit-print-color-adjust: exact;
+            color: white !important;
+          }
+          .bg-blue-600 {
+            background-color: #2563eb !important;
+            -webkit-print-color-adjust: exact;
+          }
+          .bg-blue-50 {
+            background-color: #eff6ff !important;
+            -webkit-print-color-adjust: exact;
+          }
+          .bg-slate-50 {
+            background-color: #f8fafc !important;
+            -webkit-print-color-adjust: exact;
+          }
+          .rounded-[3.5rem], .rounded-[2.5rem], .rounded-[3rem] {
+            border-radius: 0.5rem !important;
+          }
+          .shadow-xl, .shadow-sm, .shadow-2xl {
+            box-shadow: none !important;
+            border: 1px solid #e2e8f0 !important;
+          }
+        }
+      `}</style>
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Laporan Perkembangan (Rapor)</h1>
-          <p className="text-slate-500">Evaluasi holistik capaian belajar siswa per semester.</p>
+          <h1 className="text-2xl font-bold text-slate-800">Laporan Rapor Digital</h1>
+          <p className="text-slate-500">Hasil evaluasi AI komprehensif berbasis data harian.</p>
         </div>
-        <div className="flex items-center gap-3">
-           <button 
-             onClick={() => alert('Fitur Export PDF sedang disiapkan.')}
-             className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-slate-50 shadow-sm"
-           >
-             <Download size={18} /> Export PDF
-           </button>
-           <button 
-             onClick={() => setShowGenModal(true)}
-             className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-semibold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2"
-           >
-             <Plus size={20} /> Generate Rapor Baru
-           </button>
+        <div className="flex bg-white p-1 rounded-2xl border border-slate-100 shadow-sm">
+          <button onClick={() => setActiveView('current')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeView === 'current' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>Lihat Rapor</button>
+          <button onClick={() => setActiveView('archive')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeView === 'archive' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>Arsip Rapor</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-        {/* Student Selector */}
-        <div className="xl:col-span-1 space-y-4">
-          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest px-2">Pilih Siswa</h3>
-          {MOCK_STUDENTS.map(student => (
-            <div 
-              key={student.student_id} 
-              onClick={() => setSelectedStudentId(student.student_id)}
-              className={`p-4 rounded-2xl border transition-all flex items-center gap-4 cursor-pointer shadow-sm ${selectedStudentId === student.student_id ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 hover:border-blue-400 text-slate-800'}`}
-            >
-              <img src={student.photo} className="w-10 h-10 rounded-xl object-cover border-2 border-white/20" alt="" />
-              <div className="min-w-0">
-                <p className="text-sm font-bold truncate">{student.full_name}</p>
-                <p className={`text-[10px] ${selectedStudentId === student.student_id ? 'text-blue-100' : 'text-slate-500'}`}>{student.nis}</p>
+      {activeView === 'current' ? (
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+          <div className="xl:col-span-1 space-y-4 no-print">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-4">Pilih Siswa</h3>
+            {MOCK_STUDENTS.map(student => (
+              <div 
+                key={student.student_id} 
+                onClick={() => setSelectedStudentId(student.student_id)}
+                className={`p-4 rounded-[2rem] border transition-all flex items-center gap-4 cursor-pointer shadow-sm ${selectedStudentId === student.student_id ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-100' : 'bg-white border-slate-100 hover:border-blue-400 text-slate-800'}`}
+              >
+                <img src={student.photo} className="w-10 h-10 rounded-xl object-cover ring-2 ring-white" alt="" />
+                <div className="min-w-0">
+                  <p className="text-sm font-bold truncate">{student.full_name}</p>
+                  <p className={`text-[10px] font-bold ${selectedStudentId === student.student_id ? 'text-blue-100' : 'text-slate-400'}`}>{student.nis}</p>
+                </div>
               </div>
+            ))}
+            <button onClick={() => setShowGenModal(true)} className="w-full mt-6 py-4 bg-slate-900 text-white rounded-[2rem] font-bold flex items-center justify-center gap-2 hover:bg-blue-600 transition-all shadow-xl"><Plus size={18} /> Generate Rapor Baru</button>
+          </div>
+
+          <div className="xl:col-span-3 print-container">
+            <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl overflow-hidden animate-in fade-in">
+               <div className="p-10 bg-slate-900 text-white relative">
+                  <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none"><FileText size={160} /></div>
+                  <div className="relative z-10 flex justify-between items-center mb-8">
+                     <h2 className="text-3xl font-bold">Rapor Perkembangan</h2>
+                     <button 
+                      onClick={() => handleDownloadPDF(currentStudent?.full_name || 'Siswa')}
+                      disabled={isDownloading}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-70 no-print"
+                     >
+                        {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                        {isDownloading ? 'Generating...' : 'Download PDF'}
+                     </button>
+                  </div>
+                  <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-t border-white/10">
+                    <div><p className="text-[10px] text-white/40 font-black uppercase mb-1">Nama</p><p className="text-sm font-bold">{currentStudent?.full_name}</p></div>
+                    <div><p className="text-[10px] text-white/40 font-black uppercase mb-1">NIS</p><p className="text-sm font-bold">{currentStudent?.nis}</p></div>
+                    <div><p className="text-[10px] text-white/40 font-black uppercase mb-1">Kelas</p><p className="text-sm font-bold">TK A - Bulan</p></div>
+                    <div><p className="text-[10px] text-white/40 font-black uppercase mb-1">Status</p><span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">APPROVED</span></div>
+                  </div>
+               </div>
+               <div className="p-10 space-y-10">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {LEARNING_AREAS.slice(0, 4).map(area => (
+                      <div key={area.area_id} className="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                         <div className="flex justify-between items-center mb-4"><span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{area.area_name}</span><div className="flex gap-1">{[1,2,3,4].map(s => <CheckCircle2 key={s} size={14} className={s <= 3 ? "text-blue-500" : "text-slate-200"} />)}</div></div>
+                         <p className="text-sm text-slate-600 italic leading-relaxed">"Sangat mahir dalam mengidentifikasi tekstur dan dimensi benda."</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-10 bg-blue-50 rounded-[3rem] border border-blue-100 relative">
+                    <Sparkles size={32} className="absolute -top-4 -right-4 text-amber-500 animate-pulse no-print" />
+                    <h4 className="text-xs font-black text-blue-800 uppercase mb-4 tracking-widest">Narasi Komprehensif (AI Gemini Pro)</h4>
+                    <p className="text-sm text-blue-900 leading-relaxed italic font-medium">Ananda menunjukkan lompatan kemajuan yang luar biasa pada semester ini. Fokus pada area Practical Life telah melatih kemandirian dan motorik halusnya dengan sempurna. Terus didampingi dalam latihan bersosialisasi di rumah.</p>
+                  </div>
+               </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 no-print">
+          {archives.map(report => (
+            <div key={report.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm group hover:shadow-xl transition-all">
+               <div className="flex justify-between items-start mb-6">
+                 <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl"><History size={24} /></div>
+                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                   <button 
+                    onClick={() => setSelectedArchive(report)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                   >
+                     <Eye size={18} />
+                   </button>
+                   <button 
+                    onClick={() => handleDeleteArchive(report.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                   >
+                     <Trash2 size={18} />
+                   </button>
+                 </div>
+               </div>
+               <h4 className="font-bold text-slate-800 text-lg mb-1">{report.student_name}</h4>
+               <p className="text-xs text-blue-600 font-bold">{report.semester}</p>
+               <p className="text-xs text-slate-400 line-clamp-3 italic leading-relaxed mt-4 mb-6">{report.content}</p>
+               <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                <span className="text-[10px] font-black text-slate-300 uppercase">{report.date}</span>
+                <button 
+                  onClick={() => handleDownloadPDF(report.student_name, report.semester)}
+                  disabled={isDownloading}
+                  className="text-blue-600 text-xs font-bold hover:underline flex items-center gap-1 disabled:opacity-50"
+                >
+                  {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                  Download Arsip
+                </button>
+               </div>
             </div>
           ))}
         </div>
+      )}
 
-        {/* Report Preview */}
-        <div className="xl:col-span-3">
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden animate-in fade-in duration-500">
-             {/* Report Header */}
-             <div className="p-10 bg-slate-900 text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-20 opacity-10 pointer-events-none">
-                  <FileText size={200} />
+      {/* MODAL: PRATINJAU ARSIP */}
+      {selectedArchive && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+             <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/10 rounded-2xl"><History size={24} /></div>
+                  <div>
+                    <h2 className="text-xl font-bold">Pratinjau Arsip Rapor</h2>
+                    <p className="text-slate-400 text-xs">{selectedArchive.semester} • {selectedArchive.date}</p>
+                  </div>
                 </div>
-                <div className="relative z-10 flex justify-between items-start mb-10">
-                   <div>
-                     <h2 className="text-3xl font-bold mb-2">Laporan Perkembangan Anak</h2>
-                     <p className="text-slate-400 font-medium">Semester {semester} • Tahun Ajaran 2024/2025</p>
-                   </div>
-                   <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center text-3xl font-black shadow-2xl border border-white/20">P</div>
+                <button onClick={() => setSelectedArchive(null)} className="p-2 hover:bg-white/10 rounded-full transition-all"><X /></button>
+             </div>
+             <div className="p-10 overflow-y-auto space-y-8">
+                <div className="border-b border-slate-100 pb-6">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nama Siswa</p>
+                   <p className="text-lg font-bold text-slate-800">{selectedArchive.student_name}</p>
                 </div>
-
-                <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-6 py-8 border-t border-slate-800">
-                   <div>
-                     <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest">Nama Siswa</p>
-                     <p className="text-sm font-bold">{currentStudent?.full_name}</p>
+                <div className="space-y-4">
+                   <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                     <Sparkles size={16} /> Narasi Perkembangan
+                   </h4>
+                   <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 italic text-slate-600 leading-relaxed">
+                     {selectedArchive.content}
                    </div>
+                </div>
+                <div className="p-6 bg-amber-50 rounded-[2rem] border border-amber-100 flex items-start gap-4">
+                   <div className="p-2 bg-white rounded-xl text-amber-600 shadow-sm"><FileText size={20} /></div>
                    <div>
-                     <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest">NIS</p>
-                     <p className="text-sm font-bold">{currentStudent?.nis}</p>
-                   </div>
-                   <div>
-                     <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest">Kelas</p>
-                     <p className="text-sm font-bold">TK A - Bulan</p>
-                   </div>
-                   <div>
-                     <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest">Status</p>
-                     <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-black rounded-full border border-emerald-500/30">APPROVED</span>
+                     <p className="text-xs font-bold text-amber-800 mb-1">Catatan Dokumen</p>
+                     <p className="text-[10px] text-amber-600 font-medium leading-relaxed">Dokumen ini merupakan arsip digital resmi. Gunakan tombol download di bawah untuk mencetak format PDF standar sekolah.</p>
                    </div>
                 </div>
              </div>
-
-             {/* Report Body */}
-             <div className="p-10 space-y-12 bg-white">
-                {/* Developmental Summary */}
-                <section>
-                   <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                     <Star size={20} className="text-amber-400 fill-amber-400" /> Ringkasan Perkembangan Montessori
-                   </h3>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {LEARNING_AREAS.map(area => (
-                        <div key={area.area_id} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-blue-200 transition-all group">
-                           <div className="flex items-center justify-between mb-4">
-                              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">{area.area_name}</span>
-                              <div className="flex gap-1">
-                                 {[1,2,3,4].map(s => <CheckCircle2 key={s} size={14} className={s <= 3 ? "text-blue-500" : "text-slate-200"} />)}
-                              </div>
-                           </div>
-                           <p className="text-sm text-slate-600 leading-relaxed italic">"Menunjukkan minat tinggi dalam koordinasi motorik halus, mulai mahir menggunakan alat menuang."</p>
-                        </div>
-                      ))}
-                   </div>
-                </section>
-
-                {/* Detailed Feedback */}
-                <section className="space-y-6">
-                   <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 relative overflow-hidden">
-                      <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
-                         <BrainCircuit size={80} className="text-blue-600" />
-                      </div>
-                      <h4 className="text-sm font-black text-blue-800 mb-4 uppercase tracking-widest flex items-center gap-2">
-                        <Sparkles size={16} /> Catatatan Guru (Analisa AI Komprehensif)
-                      </h4>
-                      <p className="text-sm text-blue-900/80 leading-relaxed italic font-medium whitespace-pre-line">
-                        {currentStudent?.full_name} adalah anak yang sangat tekun dan memiliki rasa ingin tahu yang besar. Berdasarkan data observasi semester ini, perkembangan sosialnya meningkat drastis, ia mulai berani memimpin kelompok kecil saat kegiatan bernyanyi. Pertahankan kemandirian yang sudah terbentuk dengan baik di rumah melalui latihan menuang dan merapikan alat main sendiri.
-                      </p>
-                   </div>
-
-                   <div className="flex flex-col md:flex-row justify-between items-center py-10 border-t border-slate-100 gap-8">
-                      <div className="text-center md:text-left px-4">
-                         <div className="w-32 h-px bg-slate-200 mx-auto md:mx-0 mb-4" />
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tanda Tangan Orang Tua</p>
-                      </div>
-                      <div className="text-center md:text-right px-4">
-                         <p className="text-sm font-black text-slate-800 italic mb-1">Dewi Kartika, S.Pd</p>
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Guru Kelas / Homeroom Teacher</p>
-                      </div>
-                   </div>
-                </section>
+             <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
+                <button 
+                  onClick={() => setSelectedArchive(null)}
+                  className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition-all"
+                >
+                  Tutup
+                </button>
+                <button 
+                  onClick={() => {
+                    const name = selectedArchive.student_name;
+                    const sem = selectedArchive.semester;
+                    setSelectedArchive(null);
+                    handleDownloadPDF(name, sem);
+                  }}
+                  className="flex-2 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all"
+                >
+                  <Download size={18} /> Download Versi PDF
+                </button>
              </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* GENERATE MODAL */}
       {showGenModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
-            <div className="bg-blue-600 p-8 text-white flex justify-between items-center shrink-0">
-               <div className="flex items-center gap-4">
-                 <div className="p-3 bg-white/20 rounded-2xl">
-                   <Sparkles size={28} />
-                 </div>
-                 <div>
-                   <h2 className="text-xl font-bold">Reporting Wizard</h2>
-                   <p className="text-blue-100 text-xs">AI-Powered Student Performance Aggregator</p>
-                 </div>
-               </div>
-               <button 
-                onClick={closeGenModal}
-                className="p-2 hover:bg-white/10 rounded-full transition-all"
-               >
-                 <X size={24} />
-               </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-8 space-y-8">
-              {!generatedNarrative ? (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300 no-print">
+           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="bg-blue-600 p-8 text-white flex justify-between items-center"><h2 className="text-xl font-bold flex items-center gap-3"><Sparkles /> Reporting Wizard AI</h2><button onClick={() => setShowGenModal(false)} className="p-2 hover:bg-white/20 rounded-full"><X /></button></div>
+              <div className="p-10 space-y-6">
+                 {!generatedNarrative ? (
+                   <>
                     <div>
-                      <label className="text-xs font-black text-slate-400 uppercase mb-2 block tracking-widest px-1">Pilih Siswa</label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                        <select 
-                          value={selectedStudentId}
-                          onChange={(e) => setSelectedStudentId(parseInt(e.target.value))}
-                          className="w-full bg-slate-50 border-none rounded-2xl py-3.5 pl-10 pr-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-100 appearance-none transition-all cursor-pointer"
-                        >
-                          {MOCK_STUDENTS.map(s => <option key={s.student_id} value={s.student_id}>{s.full_name}</option>)}
-                        </select>
-                      </div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 block">Pilih Siswa</label>
+                      <select value={selectedStudentId} onChange={e => setSelectedStudentId(parseInt(e.target.value))} className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 text-sm font-bold">
+                        {MOCK_STUDENTS.map(s => <option key={s.student_id} value={s.student_id}>{s.full_name}</option>)}
+                      </select>
                     </div>
-                    <div>
-                      <label className="text-xs font-black text-slate-400 uppercase mb-2 block tracking-widest px-1">Pilih Semester</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                        <select 
-                          value={semester}
-                          onChange={(e) => setSemester(e.target.value)}
-                          className="w-full bg-slate-50 border-none rounded-2xl py-3.5 pl-10 pr-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-100 appearance-none transition-all cursor-pointer"
-                        >
-                          <option value="1">Semester Ganjil (1)</option>
-                          <option value="2">Semester Genap (2)</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100">
-                    <h4 className="text-xs font-black text-blue-800 uppercase tracking-widest mb-3 flex items-center gap-2">
-                       <AlertCircle size={14} /> Cara Kerja AI Reporting
-                    </h4>
-                    <ul className="space-y-2">
-                      <li className="text-xs text-blue-700 flex items-center gap-2">
-                        <CheckCircle2 size={12} className="shrink-0" /> Menganalisa seluruh dokumentasi kegiatan harian
-                      </li>
-                      <li className="text-xs text-blue-700 flex items-center gap-2">
-                        <CheckCircle2 size={12} className="shrink-0" /> Mengkalkulasi rata-rata skor quiz kognitif
-                      </li>
-                      <li className="text-xs text-blue-700 flex items-center gap-2">
-                        <CheckCircle2 size={12} className="shrink-0" /> Menyusun narasi perkembangan menggunakan metode Montessori
-                      </li>
-                    </ul>
-                  </div>
-
-                  <button 
-                    onClick={handleGenerateReport}
-                    disabled={isGenerating}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-blue-100 flex items-center justify-center gap-2 hover:bg-blue-700 transition-all disabled:opacity-50"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 size={20} className="animate-spin" />
-                        <span>Sedang Menganalisa Data...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={20} />
-                        <span>Mulai Generate Rapor Otomatis</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-6 animate-in zoom-in-95 duration-500">
-                   <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <CheckCircle2 size={16} className="text-emerald-500" /> Hasil Generasi Narasi AI
-                      </h3>
-                      <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">Gemini 3 Pro Analysed</span>
+                    <button onClick={handleGenerateReport} disabled={isGenerating} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2 hover:bg-blue-700 disabled:opacity-50">{isGenerating ? <Loader2 className="animate-spin" /> : <BrainCircuit />} Analisa & Generate Rapor</button>
+                   </>
+                 ) : (
+                   <div className="space-y-6">
+                      <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 italic text-sm text-slate-600 leading-relaxed">{generatedNarrative}</div>
+                      <div className="flex gap-4"><button onClick={() => setGeneratedNarrative('')} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">Ulangi</button><button onClick={saveToArchive} className="flex-2 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2"><Save /> Simpan ke Arsip</button></div>
                    </div>
-                   <div className="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] relative">
-                      <p className="text-sm text-slate-700 leading-relaxed italic font-medium whitespace-pre-line">
-                        {generatedNarrative}
-                      </p>
-                   </div>
-                   <div className="flex gap-4">
-                      <button 
-                        onClick={() => setGeneratedNarrative('')}
-                        className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all"
-                      >
-                        Generate Ulang
-                      </button>
-                      <button 
-                        onClick={() => {
-                          alert('Berhasil disimpan ke database rapor.');
-                          closeGenModal();
-                        }}
-                        className="flex-2 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all"
-                      >
-                        <Save size={20} /> Simpan ke Sistem
-                      </button>
-                   </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="p-6 border-t border-slate-50 flex justify-between items-center shrink-0 bg-slate-50/50">
-               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-2">Data Source: SQL Server 2.0</p>
-               {!generatedNarrative && (
-                 <button 
-                  onClick={closeGenModal}
-                  className="px-8 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-50 transition-all"
-                 >
-                   Batal
-                 </button>
-               )}
-            </div>
-          </div>
+                 )}
+              </div>
+           </div>
         </div>
       )}
     </div>

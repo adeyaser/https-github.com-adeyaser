@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   PlayCircle, 
   FileText, 
@@ -18,10 +18,13 @@ import {
   User,
   ExternalLink,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Trophy,
+  Eye,
+  CheckCircle
 } from 'lucide-react';
-import { MOCK_MODULES, LEARNING_AREAS, MOCK_USER } from '../constants';
-import { ElearningModule } from '../types';
+import { MOCK_MODULES, LEARNING_AREAS, MOCK_USER, MOCK_QUIZ_RESULTS } from '../constants';
+import { ElearningModule, QuizResult } from '../types';
 
 const MOCK_SCHEDULE = [
   { id: 1, title: 'Bercerita: Si Kancil & Buaya', time: '10:00 - 10:30', day: 'Senin', teacher: 'Ibu Dewi', type: 'Zoom' },
@@ -38,6 +41,11 @@ const ElearningView: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [activeVideoId, setActiveVideoId] = useState<number | null>(null);
   const [editingModuleId, setEditingModuleId] = useState<number | null>(null);
+  
+  // Progress tracking state (simulated local storage/DB)
+  const [completedModules, setCompletedModules] = useState<number[]>([]);
+  const [viewedModules, setViewedModules] = useState<number[]>([]);
+
   const isTeacher = MOCK_USER.user_type === 'teacher' || MOCK_USER.user_type === 'admin';
 
   // Form State
@@ -46,13 +54,18 @@ const ElearningView: React.FC = () => {
     module_description: '',
     class_level: 'TK A',
     area_id: 1,
-    // Fix: Cast content_type to ElearningModule['content_type'] to allow document, interactive, and quiz types
     content_type: 'video' as ElearningModule['content_type'],
     content_url: '',
     duration_minutes: 10
   };
 
   const [formData, setFormData] = useState(initialFormState);
+
+  // Initialize progress
+  useEffect(() => {
+    // In a real app, this would fetch from an API
+    setCompletedModules([2]); // Example: Module 2 is completed
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -79,11 +92,23 @@ const ElearningView: React.FC = () => {
 
   const handleJoinLive = () => {
     setIsConnecting(true);
-    // Simulate connection delay
     setTimeout(() => {
       setIsConnecting(false);
       alert("Menghubungkan ke Ruang Kelas Virtual (Secure Montessori Gateway)... Mohon tunggu hingga Guru memulai sesi.");
     }, 1500);
+  };
+
+  const markAsComplete = (moduleId: number) => {
+    if (!completedModules.includes(moduleId)) {
+      setCompletedModules(prev => [...prev, moduleId]);
+    }
+    setActiveVideoId(null);
+  };
+
+  const markAsViewed = (moduleId: number) => {
+    if (!viewedModules.includes(moduleId)) {
+      setViewedModules(prev => [...prev, moduleId]);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -122,6 +147,13 @@ const ElearningView: React.FC = () => {
     }
   };
 
+  // Helper to check if a module has a completed quiz
+  const getQuizStatus = (moduleId: number) => {
+    // In our mock data, linked_quiz_id might be module_id for simplicity or explicitly mapped
+    const quizResult = MOCK_QUIZ_RESULTS.find(r => r.quiz_id === moduleId); // Simple mapping for mock
+    return quizResult;
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -146,6 +178,39 @@ const ElearningView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Progress Summary for Students */}
+      {!isManagementMode && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+              <CheckCircle size={24} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Materi Selesai</p>
+              <p className="text-xl font-bold text-slate-800">{completedModules.length} Modul</p>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
+              <Eye size={24} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sedang Dipelajari</p>
+              <p className="text-xl font-bold text-slate-800">{viewedModules.length} Modul</p>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+              <Trophy size={24} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Skor Quiz</p>
+              <p className="text-xl font-bold text-slate-800">100/100</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Module Form */}
       {isManagementMode && showAddForm && (
@@ -306,9 +371,12 @@ const ElearningView: React.FC = () => {
            const isPlaying = activeVideoId === module.module_id;
            const isVideo = module.content_type === 'video';
            const hasUrl = module.content_url && module.content_url !== '#';
+           const isCompleted = completedModules.includes(module.module_id);
+           const isViewed = viewedModules.includes(module.module_id);
+           const quizStatus = getQuizStatus(module.module_id);
 
            return (
-             <div key={module.module_id} className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm group hover:shadow-xl transition-all flex flex-col relative animate-in zoom-in duration-300">
+             <div key={module.module_id} className={`bg-white rounded-3xl overflow-hidden border transition-all flex flex-col relative animate-in zoom-in duration-300 ${isCompleted ? 'border-emerald-200 shadow-emerald-50' : 'border-slate-100 shadow-sm'} group hover:shadow-xl`}>
                {isManagementMode && (
                  <div className="absolute top-2 right-2 z-30 flex gap-1">
                    <button 
@@ -320,6 +388,13 @@ const ElearningView: React.FC = () => {
                    <button className="p-2 bg-white/90 backdrop-blur rounded-lg shadow-sm text-red-600 hover:bg-red-600 hover:text-white transition-all transform hover:scale-110 active:scale-95">
                      <Trash2 size={14} />
                    </button>
+                 </div>
+               )}
+
+               {/* Completion Badge */}
+               {!isManagementMode && isCompleted && (
+                 <div className="absolute top-2 right-2 z-30 bg-emerald-500 text-white p-1.5 rounded-full shadow-lg border-2 border-white">
+                   <CheckCircle2 size={16} />
                  </div>
                )}
                
@@ -340,26 +415,42 @@ const ElearningView: React.FC = () => {
                           className="w-full h-full object-contain" 
                           controls 
                           autoPlay
+                          onEnded={() => markAsComplete(module.module_id)}
                         />
                       )}
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveVideoId(null);
-                        }}
-                        className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full hover:bg-black/80 transition-all shadow-xl"
-                      >
-                        <X size={16} />
-                      </button>
+                      <div className="absolute top-2 right-2 flex gap-2">
+                         <button 
+                          onClick={() => markAsComplete(module.module_id)}
+                          className="p-1.5 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-all shadow-xl"
+                          title="Tandai Selesai"
+                         >
+                           <CheckCircle2 size={16} />
+                         </button>
+                         <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveVideoId(null);
+                          }}
+                          className="p-1.5 bg-black/60 text-white rounded-full hover:bg-black/80 transition-all shadow-xl"
+                         >
+                           <X size={16} />
+                         </button>
+                      </div>
                     </div>
                   ) : (
                     <div 
-                      className={`w-full h-full flex items-center justify-center relative ${isVideo && hasUrl ? 'cursor-pointer group/thumb' : ''}`}
-                      onClick={() => (isVideo && hasUrl) ? setActiveVideoId(module.module_id) : null}
+                      className={`w-full h-full flex items-center justify-center relative ${(isVideo || module.content_type === 'document') && hasUrl ? 'cursor-pointer group/thumb' : ''}`}
+                      onClick={() => {
+                        if (hasUrl) {
+                          if (isVideo) setActiveVideoId(module.module_id);
+                          markAsViewed(module.module_id);
+                          if (module.content_type === 'document') window.open(module.content_url, '_blank');
+                        }
+                      }}
                     >
                       <div 
-                        className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity"
-                        style={{ backgroundColor: area?.color_code }}
+                        className={`absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity ${isCompleted ? 'bg-emerald-500' : ''}`}
+                        style={!isCompleted ? { backgroundColor: area?.color_code } : undefined}
                       ></div>
                       
                       {isVideo ? (
@@ -368,7 +459,10 @@ const ElearningView: React.FC = () => {
                           <span className="text-[10px] font-bold text-white uppercase bg-black/40 px-3 py-1 rounded-full backdrop-blur-md shadow-lg border border-white/20">Putar Video</span>
                         </div>
                       ) : module.content_type === 'document' ? (
-                        <FileText size={56} className="text-emerald-400 opacity-60 group-hover:opacity-100 transition-all drop-shadow-xl" />
+                        <div className="relative flex flex-col items-center gap-2">
+                           <FileText size={56} className="text-emerald-400 opacity-60 group-hover:opacity-100 transition-all drop-shadow-xl" />
+                           <span className="text-[10px] font-bold text-white uppercase bg-black/40 px-3 py-1 rounded-full backdrop-blur-md shadow-lg border border-white/20">Baca Materi</span>
+                        </div>
                       ) : module.content_type === 'interactive' ? (
                         <Puzzle size={56} className="text-purple-400 opacity-60 group-hover:opacity-100 transition-all drop-shadow-xl" />
                       ) : (
@@ -389,28 +483,58 @@ const ElearningView: React.FC = () => {
 
                <div className="p-5 flex-1 flex flex-col">
                  <div className="flex justify-between items-start mb-2">
-                   <h3 className="font-bold text-slate-800 truncate leading-tight pr-4" title={module.module_title}>{module.module_title}</h3>
+                   <h3 className={`font-bold truncate leading-tight pr-4 ${isCompleted ? 'text-emerald-800' : 'text-slate-800'}`} title={module.module_title}>{module.module_title}</h3>
                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 shrink-0 uppercase tracking-widest">
                      {module.class_level}
                    </span>
                  </div>
                  <p className="text-xs text-slate-500 mb-4 line-clamp-2 leading-relaxed h-8">{module.module_description}</p>
+                 
+                 {/* Quiz Link Notification */}
+                 {module.content_type === 'quiz' && quizStatus && (
+                   <div className="mb-4 p-2 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-2 animate-in slide-in-from-left-2">
+                     <Trophy size={14} className="text-emerald-600" />
+                     <span className="text-[10px] font-bold text-emerald-700">Quiz Selesai: {quizStatus.score}%</span>
+                   </div>
+                 )}
+
                  <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       <Clock size={12} className="text-slate-300" /> {module.duration_minutes} Menit
                     </div>
-                    {isVideo ? (
-                      <button 
-                        onClick={() => hasUrl ? setActiveVideoId(isPlaying ? null : module.module_id) : alert('URL Video tidak tersedia')}
-                        className={`text-xs font-bold transition-all flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${isPlaying ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'}`}
-                      >
-                        {isPlaying ? <><X size={14} /> Tutup</> : <><PlayCircle size={14} /> Putar Video</>}
-                      </button>
-                    ) : (
-                      <button className="text-blue-600 text-xs font-bold hover:underline bg-blue-50 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition-all flex items-center gap-1.5">
-                        {module.content_type === 'document' ? <FileText size={14} /> : <Puzzle size={14} />} Buka Materi
-                      </button>
-                    )}
+                    
+                    <div className="flex gap-2">
+                      {!isManagementMode && !isCompleted && hasUrl && (
+                        <button 
+                          onClick={() => markAsComplete(module.module_id)}
+                          className="text-[10px] font-black uppercase text-slate-400 hover:text-emerald-600 transition-colors"
+                          title="Tandai Selesai"
+                        >
+                          Selesaikan
+                        </button>
+                      )}
+                      
+                      {isVideo ? (
+                        <button 
+                          onClick={() => hasUrl ? setActiveVideoId(isPlaying ? null : module.module_id) : alert('URL Video tidak tersedia')}
+                          className={`text-xs font-bold transition-all flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${isPlaying ? 'bg-red-50 text-red-600' : isCompleted ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'}`}
+                        >
+                          {isPlaying ? <><X size={14} /> Tutup</> : isCompleted ? <><CheckCircle2 size={14} /> Putar Lagi</> : <><PlayCircle size={14} /> Putar Video</>}
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            if (hasUrl) {
+                              markAsViewed(module.module_id);
+                              if (module.content_type === 'document') window.open(module.content_url, '_blank');
+                            }
+                          }}
+                          className={`text-xs font-bold transition-all flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${isCompleted ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'}`}
+                        >
+                          {module.content_type === 'document' ? <FileText size={14} /> : <Puzzle size={14} />} Buka Materi
+                        </button>
+                      )}
+                    </div>
                  </div>
                </div>
              </div>

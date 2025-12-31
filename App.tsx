@@ -14,19 +14,44 @@ import ReportsView from './components/ReportsView';
 import MaterialsView from './components/MaterialsView';
 import EnrollmentsView from './components/EnrollmentsView';
 import SettingsView from './components/SettingsView';
+import LandingView from './components/LandingView';
+import LoginView from './components/LoginView';
+import FinanceView from './components/FinanceView';
+import GalleryView from './components/GalleryView';
+import PublicCurriculumView from './components/PublicCurriculumView';
+import PublicAboutView from './components/PublicAboutView';
+import PublicGalleryView from './components/PublicGalleryView';
 
-// App Views routing mapping
-type ViewType = '/' | '/students' | '/classes' | '/learning' | '/attendance' | '/assessment' | '/elearning' | '/games' | '/chats' | '/reports' | '/materials' | '/enrollments' | '/settings';
+type ViewType = '/' | '/students' | '/classes' | '/learning' | '/attendance' | '/assessment' | '/elearning' | '/games' | '/chats' | '/reports' | '/materials' | '/enrollments' | '/settings' | '/finance' | '/gallery' | '/curriculum' | '/about' | '/public-gallery';
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoginView, setIsLoginView] = useState(false);
   const [currentPath, setCurrentPath] = useState<ViewType>('/');
+  const [user, setUser] = useState<any>(null);
+  const [selectedStudentIdForReport, setSelectedStudentIdForReport] = useState<number | null>(null);
 
-  const renderView = () => {
+  const handleLoginSuccess = (userData: any) => {
+    setUser(userData);
+    setIsAuthenticated(true);
+    setIsLoginView(false);
+    setCurrentPath('/');
+  };
+
+  const handleNavigation = (path: string, studentId?: number) => {
+    if (studentId) {
+      setSelectedStudentIdForReport(studentId);
+    }
+    setCurrentPath(path as ViewType);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const renderDashboardView = () => {
     switch (currentPath) {
       case '/':
-        return <DashboardView />;
+        return <DashboardView onNavigate={handleNavigation} />;
       case '/students':
-        return <StudentsView />;
+        return <StudentsView onNavigate={handleNavigation} />;
       case '/classes':
         return <ClassesView />;
       case '/learning':
@@ -42,13 +67,28 @@ const App: React.FC = () => {
       case '/chats':
         return <ChatView />;
       case '/reports':
-        return <ReportsView />;
+        return (
+          <ReportsView 
+            initialStudentId={selectedStudentIdForReport} 
+            onClearInitial={() => setSelectedStudentIdForReport(null)}
+          />
+        );
       case '/materials':
         return <MaterialsView />;
       case '/enrollments':
         return <EnrollmentsView />;
       case '/settings':
         return <SettingsView />;
+      case '/finance':
+        return <FinanceView />;
+      case '/gallery':
+        return <GalleryView />;
+      case '/curriculum':
+        return <PublicCurriculumView onBack={() => setCurrentPath('/')} />;
+      case '/about':
+        return <PublicAboutView onBack={() => setCurrentPath('/')} />;
+      case '/public-gallery':
+        return <PublicGalleryView onBack={() => setCurrentPath('/')} />;
       default:
         return (
           <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4 animate-in fade-in zoom-in duration-300">
@@ -70,9 +110,28 @@ const App: React.FC = () => {
     }
   };
 
+  if (!isAuthenticated) {
+    if (currentPath === '/curriculum') {
+      return <PublicCurriculumView onBack={() => setCurrentPath('/')} />;
+    }
+    if (currentPath === '/about') {
+      return <PublicAboutView onBack={() => setCurrentPath('/')} />;
+    }
+    if (currentPath === '/public-gallery') {
+      return <PublicGalleryView onBack={() => setCurrentPath('/')} />;
+    }
+    if (isLoginView) {
+      return <LoginView onLoginSuccess={handleLoginSuccess} onBack={() => setIsLoginView(false)} />;
+    }
+    return <LandingView onLoginClick={() => setIsLoginView(true)} onNavigate={handleNavigation} />;
+  }
+
   return (
-    <Layout activePath={currentPath} onNavigate={(path) => setCurrentPath(path as ViewType)}>
-      {renderView()}
+    <Layout 
+      activePath={currentPath} 
+      onNavigate={handleNavigation}
+    >
+      {renderDashboardView()}
     </Layout>
   );
 };
